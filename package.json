@@ -1,7 +1,7 @@
 {
   "name": "qoyod-bonus-system",
   "version": "2.0.0",
-  "description": "äÙÇã ÍÓÇÈ ÇáÈæäÕ - ÞíæÏ API v2.0",
+  "description": "Bonus System API",
   "main": "index.js",
   "engines": {
     "node": ">=18.0.0"
