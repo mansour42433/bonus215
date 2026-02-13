@@ -1,14 +1,13 @@
 {
-  "name": "qoyod-bonus-system",
-  "version": "1.0.0",
-  "description": "نظام حساب البونص من Qoyod API",
+  "name": "qoyod-bonus-final",
+  "version": "2.0.0",
+  "description": "نظام حساب البونص من Qoyod API - نسخة محدثة مع فلترة المواقع",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon index.js"
   },
-  "keywords": ["qoyod", "bonus", "api", "express"],
+  "keywords": ["qoyod", "bonus", "api", "express", "inventory"],
   "author": "",
   "license": "ISC",
   "dependencies": {

@@ -9,11 +9,21 @@ const validator = require("./utils/validator");
 const app = express();
 
 // ================== Middleware ==================
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://bonus215.onrender.com',
+    'https://systemfff215.vercel.app',
+    '*'  // للتطوير - احذفه في الإنتاج
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
+// Request logging
 app.use((req, res, next) => {
   logger.log(`${req.method} ${req.path}`);
   next();
@@ -21,15 +31,23 @@ app.use((req, res, next) => {
 
 // ================== Routes ==================
 
-// Health check endpoint
+// Root endpoint
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "🎯 Qoyod Bonus System API",
-    version: "1.0.0",
+    message: "🎯 Qoyod Bonus System API v2.0",
+    version: "2.0.0",
+    features: [
+      "✅ حساب البونص الشهري",
+      "✅ فلترة حسب المخزن/الموقع",
+      "✅ دعم Ransack للبحث المتقدم",
+      "✅ Qoyod API v2.0"
+    ],
     timestamp: new Date().toISOString(),
     endpoints: {
       calculate: "/api/bonus/calculate?year=2026&month=02",
+      calculateByInventory: "/api/bonus/calculate?year=2026&month=02&inventory_id=123",
+      inventories: "/api/bonus/inventories",
       branch: "/api/bonus/branch/:branchName?year=2026&month=02",
       health: "/health"
     }
@@ -44,7 +62,9 @@ app.get("/health", (req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
+    apiVersion: "2.0",
     apiKeyConfigured: isApiKeyValid,
+    apiBaseUrl: config.baseUrl,
     uptime: process.uptime()
   });
 });
@@ -62,6 +82,7 @@ app.use((req, res) => {
     path: req.path,
     availableEndpoints: [
       "/api/bonus/calculate?year=2026&month=02",
+      "/api/bonus/inventories",
       "/api/bonus/branch/:branchName?year=2026&month=02",
       "/health"
     ]
@@ -82,24 +103,31 @@ app.use((err, req, res, next) => {
 // ================== Server Startup ==================
 
 const startServer = () => {
-  // التحقق من API Key قبل البدء
+  // التحقق من API Key
   if (!validator.validateApiKey(config.apiKey)) {
-    logger.warn("⚠️  تحذير: QOYOD_API_KEY غير محدد أو غير صالح في ملف .env");
-    logger.log("يرجى نسخ ملف .env.example إلى .env وإضافة المفتاح الصحيح");
+    logger.warn("⚠️  تحذير: QOYOD_API_KEY غير محدد أو غير صالح");
+    logger.log("يرجى إضافة المفتاح في ملف .env");
+  } else {
+    logger.success("✅ QOYOD_API_KEY محدد");
   }
 
   app.listen(config.port, () => {
     logger.success(`🚀 الخادم يعمل على المنفذ ${config.port}`);
     logger.log(`📍 البيئة: ${config.nodeEnv}`);
+    logger.log(`🔗 API Version: 2.0`);
+    logger.log(`🌐 Base URL: ${config.baseUrl}`);
     logger.log(`🔗 الرابط: http://localhost:${config.port}`);
-    logger.log(`📊 API: http://localhost:${config.port}/api/bonus/calculate?year=2026&month=02`);
+    logger.log(`📊 Endpoints:`);
+    logger.log(`   - GET /api/bonus/calculate?year=2026&month=02`);
+    logger.log(`   - GET /api/bonus/inventories`);
+    logger.log(`   - GET /health`);
     console.log("\n" + "=".repeat(60) + "\n");
   });
 };
 
 startServer();
 
-// Handle unhandled promise rejections
+// Handle unhandled rejections
 process.on("unhandledRejection", (err) => {
   logger.error("Unhandled Promise Rejection:", err);
   process.exit(1);
