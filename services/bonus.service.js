@@ -1,33 +1,53 @@
 const dayjs = require("dayjs");
+const isBetween = require("dayjs/plugin/isBetween");
+dayjs.extend(isBetween);
 
 class BonusService {
   /**
-   * حساب نسبة البونص حسب قيمة السطر
+   * حساب نسبة البونص بناءً على إجمالي السطر
+   * @param {number} lineTotal - إجمالي السطر
+   * @returns {number} نسبة البونص (0.01 أو 0.02)
    */
   calculateBonusPercentage(lineTotal) {
     return lineTotal >= 70 ? 0.02 : 0.01;
   }
 
   /**
-   * حساب البونص الشهري مع دعم فلترة المخازن
+   * فلترة المدفوعات حسب الشهر
+   * @param {Array} payments - قائمة المدفوعات
+   * @param {string|number} year - السنة
+   * @param {string|number} month - الشهر
+   * @returns {Array} المدفوعات المفلترة
    */
-  calculateMonthlyBonus(invoices, payments) {
+  filterPaymentsByMonth(payments, year, month) {
+    const start = dayjs(`${year}-${String(month).padStart(2, '0')}-01`).startOf("month");
+    const end = start.endOf("month");
+
+    return payments.filter(payment => {
+      const paymentDate = dayjs(payment.date);
+      return paymentDate.isBetween(start, end, null, "[]");
+    });
+  }
+
+  /**
+   * حساب البونص الشهري
+   * @param {Array} invoices - قائمة الفواتير
+   * @param {Array} payments - قائمة المدفوعات
+   * @param {string|number} year - السنة
+   * @param {string|number} month - الشهر
+   * @returns {Object} نتائج البونص مجمعة حسب الفرع
+   */
+  calculateMonthlyBonus(invoices, payments, year, month) {
+    const filteredPayments = this.filterPaymentsByMonth(payments, year, month);
     const results = {};
 
-    payments.forEach(payment => {
-      // البحث عن الفاتورة المرتبطة
+    filteredPayments.forEach(payment => {
       const invoice = invoices.find(inv => inv.id === payment.invoice_id);
       if (!invoice) return;
 
-      const invoiceTotal = invoice.total || invoice.grand_total || 0;
-      const paymentRatio = invoiceTotal > 0 ? (payment.amount / invoiceTotal) : 0;
-      
-      // تحديد المخزن/الفرع - يدعم أسماء مختلفة
-      const branch = invoice.inventory_name 
-        || invoice.inventory?.name 
-        || invoice.branch 
-        || invoice.location 
-        || "غير محدد";
+      const invoiceTotal = invoice.total;
+      const paymentRatio = payment.amount / invoiceTotal;
+      const branch = invoice.branch || "غير محدد";
 
       // تهيئة بيانات الفرع
       if (!results[branch]) {
@@ -36,7 +56,6 @@ class BonusService {
           totalBonus: 0,
           invoiceCount: 0,
           paymentCount: 0,
-          inventoryId: invoice.inventory_id,
           details: []
         };
       }
@@ -44,17 +63,9 @@ class BonusService {
       results[branch].paymentCount++;
 
       // معالجة أسطر الفاتورة
-      const lines = invoice.lines || invoice.line_items || [];
-      
-      if (lines.length > 0) {
-        lines.forEach(line => {
-          // دعم أسماء حقول مختلفة
-          const lineTotal = line.total 
-            || line.amount 
-            || line.line_total 
-            || line.subtotal 
-            || 0;
-          
+      if (invoice.lines && invoice.lines.length > 0) {
+        invoice.lines.forEach(line => {
+          const lineTotal = line.total || 0;
           const bonusPercent = this.calculateBonusPercentage(lineTotal);
           const fullBonus = lineTotal * bonusPercent;
           const monthBonus = fullBonus * paymentRatio;
@@ -63,20 +74,11 @@ class BonusService {
           results[branch].totalBonus += monthBonus;
 
           results[branch].details.push({
-            invoiceNumber: invoice.reference 
-              || invoice.number 
-              || invoice.invoice_number 
-              || invoice.id,
-            invoiceDate: invoice.date || invoice.invoice_date,
-            paymentDate: payment.date 
-              || payment.payment_date 
-              || payment.created_at,
+            invoiceNumber: invoice.number,
+            invoiceDate: invoice.date,
+            paymentDate: payment.date,
             paymentAmount: parseFloat(payment.amount.toFixed(2)),
-            product: line.product_name 
-              || line.name 
-              || line.item_name 
-              || line.description 
-              || "غير محدد",
+            product: line.name || "غير محدد",
             lineTotal: parseFloat(lineTotal.toFixed(2)),
             bonusPercent: bonusPercent * 100,
             paymentRatio: parseFloat((paymentRatio * 100).toFixed(2)),
@@ -102,20 +104,20 @@ class BonusService {
 
   /**
    * الحصول على ملخص شامل
+   * @param {Object} bonusData - بيانات البونص
+   * @returns {Object} ملخص إحصائي
    */
   getSummary(bonusData) {
     const branches = Object.keys(bonusData);
     const totalSales = branches.reduce((sum, branch) => sum + bonusData[branch].totalSales, 0);
     const totalBonus = branches.reduce((sum, branch) => sum + bonusData[branch].totalBonus, 0);
     const totalInvoices = branches.reduce((sum, branch) => sum + bonusData[branch].invoiceCount, 0);
-    const totalPayments = branches.reduce((sum, branch) => sum + bonusData[branch].paymentCount, 0);
 
     return {
       totalBranches: branches.length,
       totalSales: parseFloat(totalSales.toFixed(2)),
       totalBonus: parseFloat(totalBonus.toFixed(2)),
       totalInvoices,
-      totalPayments,
       averageBonusPerInvoice: totalInvoices > 0 
         ? parseFloat((totalBonus / totalInvoices).toFixed(2))
         : 0,

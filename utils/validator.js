@@ -1,6 +1,9 @@
 class Validator {
   /**
    * التحقق من صحة السنة والشهر
+   * @param {string|number} year 
+   * @param {string|number} month 
+   * @returns {Object} { valid: boolean, error: string|null }
    */
   validateYearMonth(year, month) {
     if (!year || !month) {
@@ -36,6 +39,8 @@ class Validator {
 
   /**
    * التحقق من صحة API Key
+   * @param {string} apiKey 
+   * @returns {boolean}
    */
   validateApiKey(apiKey) {
     return apiKey && typeof apiKey === "string" && apiKey.length > 10;
